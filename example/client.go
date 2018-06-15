@@ -1,26 +1,50 @@
 package main
 
 import (
-	"github.com/go-redis/redis"
-	"runtime"
+	"net"
 	"fmt"
+	"io"
+	"os"
+	"log"
 )
 
 func main()  {
-	option := &redis.Options{
-		Addr:       "127.0.0.1:6789",
-		Password:   "",
-		DB:         0,
-		MaxRetries: 7,
-		PoolSize:   20 * runtime.NumCPU(),
+	addr := "127.0.0.1:6789"
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(-1)
 	}
 
-	for i := 0; i < 10000; i++ {
-		client := redis.NewClient(option)
-		cmd := client.Get("name")
-		data,_ := cmd.Result()
-		client.Close()
-		fmt.Printf("%d-%s\n", i, data)
+	for i:=0; i < 100; i++ {
+		conn.Write([]byte("test"))
 	}
 
+	go Handle(conn)
+
+	for{
+		select {}
+	}
+}
+
+func Handle(conn net.Conn) {
+	for {
+		data := make([]byte, 1024)
+		buf := make([]byte, 128)
+		for {
+			n, err := conn.Read(buf)
+			if err != nil && err != io.EOF {
+				if err != nil {
+					fmt.Println(err)
+					os.Exit(-1)
+				}
+			}
+			data = append(data, buf[:n]...)
+			if n != 128 {
+				break
+			}
+		}
+
+		fmt.Println(string(data))
+	}
 }
